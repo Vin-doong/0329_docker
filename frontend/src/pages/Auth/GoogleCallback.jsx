@@ -59,7 +59,6 @@ const GoogleCallback = () => {
     handleGoogleCallback();
   }, [location, navigate]);
 
-  // 로딩 및 에러 UI는 유지
   if (loading) {
     return (
       <div style={{ 
@@ -76,7 +75,7 @@ const GoogleCallback = () => {
           width: '40px', 
           height: '40px', 
           border: '4px solid #f3f3f3',
-          borderTop: '4px solid #3498db',
+          borderTop: '4px solid #4285F4',
           borderRadius: '50%',
           animation: 'spin 1s linear infinite'
         }}></div>

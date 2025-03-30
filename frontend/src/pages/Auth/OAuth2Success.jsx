@@ -1,7 +1,5 @@
-// frontend/src/pages/Auth/OAuth2Success.jsx
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import axios from 'axios';
 
 const OAuth2Success = () => {
   const navigate = useNavigate();
@@ -10,7 +8,7 @@ const OAuth2Success = () => {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    const processOAuthSuccess = async () => {
+    const processOAuthSuccess = () => {
       try {
         // URL에서 토큰과 이메일 파라미터 읽기
         const params = new URLSearchParams(location.search);
@@ -31,15 +29,12 @@ const OAuth2Success = () => {
           localStorage.setItem('refreshToken', refreshToken);
         }
         
-        // 사용자 정보 요청
-        const userResponse = await axios.get('/api/member/info', {
-          headers: { Authorization: `Bearer ${token}` }
-        });
+        if (email) {
+          localStorage.setItem('email', email);
+        }
         
-        // 사용자 정보 저장
-        localStorage.setItem('email', email || userResponse.data.email);
-        localStorage.setItem('memberId', userResponse.data.memberId);
-        localStorage.setItem('role', userResponse.data.memberRole || 'USER');
+        // 사용자 역할 정보 설정 (기본값 USER)
+        localStorage.setItem('role', 'USER');
         
         // 상태 업데이트 이벤트 발생
         window.dispatchEvent(new Event('storage'));
@@ -100,7 +95,7 @@ const OAuth2Success = () => {
       }}>
         <h2>로그인 오류</h2>
         <p>{error}</p>
-        <p>잠시 후 로그인 페이지로 이동합니다...</p>
+        <p>3초 후 로그인 페이지로 이동합니다...</p>
       </div>
     );
   }

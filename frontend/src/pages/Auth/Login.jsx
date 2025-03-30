@@ -1,6 +1,5 @@
-// src/pages/Auth/Login.jsx
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import './Login.css';
 import axios from 'axios';
 
@@ -9,23 +8,23 @@ const Login = () => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [oauthProviders, setOauthProviders] = useState({});
   const navigate = useNavigate();
+  const location = useLocation();
 
-  // OAuth 제공자 정보 로드
+  // URL 쿼리 파라미터에서 오류 메시지 확인
   useEffect(() => {
-    const loadOAuthProviders = async () => {
-      try {
-        const response = await axios.get('/api/oauth2/providers');
-        setOauthProviders(response.data);
-        console.log('OAuth 제공자 정보 로드 완료:', response.data);
-      } catch (error) {
-        console.error('OAuth 제공자 정보 로드 실패:', error);
+    const params = new URLSearchParams(location.search);
+    const errorType = params.get('error');
+    const errorMessage = params.get('message');
+
+    if (errorType) {
+      let displayError = '소셜 로그인 중 오류가 발생했습니다.';
+      if (errorMessage) {
+        displayError += ' ' + errorMessage;
       }
-    };
-    
-    loadOAuthProviders();
-  }, []);
+      setError(displayError);
+    }
+  }, [location]);
 
   // 일반 로그인 처리 함수
   const handleLogin = async () => {
@@ -36,7 +35,7 @@ const Login = () => {
 
     try {
       setIsLoading(true);
-      console.log("로그인 시도:", email, password);
+      console.log("로그인 시도:", email);
 
       // 백엔드 API 호출
       const response = await axios.post('/api/auth/login', {
@@ -85,16 +84,17 @@ const Login = () => {
     }
   };
 
-  // 소셜 로그인 처리 함수
+ // 구글 로그인 처리 함수
   const handleGoogleLogin = () => {
     try {
       setIsLoading(true);
       
-      // 구글 OAuth URL 구성 (도커 환경에서도 작동하는 URL 구성)
+      // 현재 도메인 기반으로 리디렉션 URI 설정
+      const serverUrl = window.location.origin;
       const clientId = '286893397263-o0opr0c1et57me60o8sq5ccdf836js75.apps.googleusercontent.com';
-      const redirectUri = encodeURIComponent('http://localhost/callback/google');
-      const scope = encodeURIComponent('email profile');
-      const authUrl = `https://accounts.google.com/o/oauth2/auth?client_id=${clientId}&redirect_uri=${redirectUri}&scope=${scope}&response_type=code`;
+      const redirectUri = `${serverUrl}/callback/google`;
+      
+      const authUrl = `https://accounts.google.com/o/oauth2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=email%20profile`;
       
       console.log('구글 로그인 URL로 이동:', authUrl);
       window.location.href = authUrl;
@@ -105,21 +105,24 @@ const Login = () => {
     }
   };
 
-  // 네이버 로그인 처리 함수 - 리다이렉트 URI 수정
+  // 네이버 로그인 처리 함수
   const handleNaverLogin = () => {
     try {
       setIsLoading(true);
       
-      // 네이버 OAuth URL 구성 (현재 URL을 기반으로 동적 생성)
+      // 현재 도메인 기반으로 리디렉션 URI 설정
+      const serverUrl = window.location.origin;
       const clientId = 'M_qS71BqoG7oESo3_thQ';
-      const redirectUri = encodeURIComponent(`${window.location.origin}/callback/naver`);
+      const redirectUri = `${serverUrl}/callback/naver`;
+      
+      // 랜덤 상태값 생성 (CSRF 방지)
       const state = [...Array(30)].map(() => (~~(Math.random() * 36)).toString(36)).join('');
       
       // CSRF 보호를 위해 state 저장
       sessionStorage.setItem('naverState', state);
       
       // URL에 state 파라미터 추가
-      const authUrl = `https://nid.naver.com/oauth2.0/authorize?response_type=code&client_id=${clientId}&redirect_uri=${redirectUri}&state=${state}`;      
+      const authUrl = `https://nid.naver.com/oauth2.0/authorize?response_type=code&client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${state}`;
       
       console.log('네이버 로그인 URL로 이동:', authUrl);
       console.log('네이버 상태 값 저장:', state);
@@ -130,7 +133,6 @@ const Login = () => {
       setIsLoading(false);
     }
   };
-
 
   return (
     <div className="login-container"

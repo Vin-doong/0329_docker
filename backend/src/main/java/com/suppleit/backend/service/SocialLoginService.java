@@ -11,17 +11,9 @@ import com.suppleit.backend.security.jwt.JwtTokenProvider;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
-import org.springframework.context.annotation.Bean;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.security.oauth2.client.registration.ClientRegistration;
-import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
-import org.springframework.security.oauth2.client.registration.InMemoryClientRegistrationRepository;
-import org.springframework.security.oauth2.core.AuthorizationGrantType;
-import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
-import org.springframework.security.oauth2.core.oidc.IdTokenClaimNames;
-import org.springframework.beans.factory.annotation.Value;
-import java.util.Arrays;
 import org.springframework.stereotype.Service;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
@@ -54,44 +46,17 @@ public class SocialLoginService {
     @Value("${spring.security.oauth2.client.registration.naver.client-secret}")
     private String naverClientSecret;
 
-    @Bean
-    public ClientRegistrationRepository clientRegistrationRepository(
-            @Value("${spring.security.oauth2.client.registration.google.client-id}") String googleClientId,
-            @Value("${spring.security.oauth2.client.registration.google.client-secret}") String googleClientSecret,
-            @Value("${spring.security.oauth2.client.registration.naver.client-id}") String naverClientId,
-            @Value("${spring.security.oauth2.client.registration.naver.client-secret}") String naverClientSecret) {
-        
-        ClientRegistration googleRegistration = ClientRegistration.withRegistrationId("google")
-                .clientId(googleClientId)
-                .clientSecret(googleClientSecret)
-                .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
-                .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
-                .redirectUri("{baseUrl}/login/oauth2/code/{registrationId}")
-                .scope("profile", "email")
-                .authorizationUri("https://accounts.google.com/o/oauth2/v2/auth")
-                .tokenUri("https://www.googleapis.com/oauth2/v4/token")
-                .userInfoUri("https://www.googleapis.com/oauth2/v3/userinfo")
-                .userNameAttributeName(IdTokenClaimNames.SUB)
-                .clientName("Google")
-                .build();
-        
-        ClientRegistration naverRegistration = ClientRegistration.withRegistrationId("naver")
-                .clientId(naverClientId)
-                .clientSecret(naverClientSecret)
-                .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
-                .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
-                .redirectUri("{baseUrl}/login/oauth2/code/{registrationId}")
-                .scope("name", "email")
-                .authorizationUri("https://nid.naver.com/oauth2.0/authorize")
-                .tokenUri("https://nid.naver.com/oauth2.0/token")
-                .userInfoUri("https://openapi.naver.com/v1/nid/me")
-                .userNameAttributeName("response")
-                .clientName("Naver")
-                .build();
-        
-        return new InMemoryClientRegistrationRepository(
-                Arrays.asList(googleRegistration, naverRegistration));
-    }
+    @Value("${spring.security.oauth2.client.registration.google.redirect-uri}")
+    private String googleRedirectUri;
+
+    @Value("${spring.security.oauth2.client.registration.naver.redirect-uri}")
+    private String naverRedirectUri;
+
+    @Value("${app.frontend.url:http://localhost}")
+    private String frontendUrl;
+
+    @Value("${app.frontend.oauth-success-redirect:/oauth2/success}")
+    private String oauthSuccessRedirectPath;
 
     // 구글 로그인
     public Map<String, Object> getGoogleMember(String code) {
@@ -106,11 +71,11 @@ public class SocialLoginService {
             tokenRequest.add("code", code);
             tokenRequest.add("client_id", googleClientId);
             tokenRequest.add("client_secret", googleClientSecret);
-            tokenRequest.add("redirect_uri", "http://localhost/callback/google"); // 수정된 부분
+            tokenRequest.add("redirect_uri", googleRedirectUri);
             tokenRequest.add("grant_type", "authorization_code");
 
             log.info("구글 클라이언트 ID: {}", googleClientId);
-            log.info("리디렉션 URI: http://localhost/callback/google"); // 수정된 로그 메시지
+            log.info("구글 리디렉션 URI: {}", googleRedirectUri);
             
             HttpEntity<MultiValueMap<String, String>> tokenEntity = new HttpEntity<>(tokenRequest, tokenHeaders);
             
@@ -131,7 +96,7 @@ public class SocialLoginService {
             
             log.info("구글 액세스 토큰 획득: {}", accessToken);
             
-            // 3. 이후 기존 로직을 사용하여 사용자 정보 요청
+            // 3. 사용자 정보 요청 처리
             return getGoogleUserInfo(accessToken);
         } catch (Exception e) {
             log.error("구글 로그인 처리 중 오류 발생: {}", e.getMessage(), e);
@@ -139,7 +104,7 @@ public class SocialLoginService {
         }
     }
     
-    // 기존 getGoogleMember 메서드를 getGoogleUserInfo로 이름 변경하고 내부 로직 유지
+    // 구글 사용자 정보 요청
     private Map<String, Object> getGoogleUserInfo(String accessToken) {
         try {
             HttpHeaders headers = new HttpHeaders();
@@ -170,6 +135,7 @@ public class SocialLoginService {
         }
     }
 
+    // 네이버 로그인
     public Map<String, Object> getNaverMember(String code) {
         try {
             log.info("네이버 인증 코드 처리 시작 - 코드: {}", code);
@@ -183,7 +149,7 @@ public class SocialLoginService {
             tokenRequest.add("client_id", naverClientId);
             tokenRequest.add("client_secret", naverClientSecret);
             tokenRequest.add("code", code);
-            tokenRequest.add("redirect_uri", "http://localhost/callback/naver"); // 수정된 부분
+            tokenRequest.add("redirect_uri", naverRedirectUri);
             
             HttpEntity<MultiValueMap<String, String>> tokenEntity = new HttpEntity<>(tokenRequest, tokenHeaders);
             
@@ -204,7 +170,7 @@ public class SocialLoginService {
             
             log.info("네이버 액세스 토큰 획득: {}", accessToken);
             
-            // 3. 이후 기존 로직을 사용하여 사용자 정보 요청
+            // 3. 사용자 정보 요청 처리
             return getNaverUserInfo(accessToken);
         } catch (Exception e) {
             log.error("네이버 로그인 처리 중 오류 발생: {}", e.getMessage(), e);
@@ -212,7 +178,7 @@ public class SocialLoginService {
         }
     }
     
-    // 기존 getNaverMember 메서드를 getNaverUserInfo로 이름 변경하고 내부 로직 유지
+    // 네이버 사용자 정보 요청
     private Map<String, Object> getNaverUserInfo(String accessToken) {
         try {
             HttpHeaders headers = new HttpHeaders();
@@ -247,7 +213,7 @@ public class SocialLoginService {
         }
     }
 
-    // 소셜 로그인 공통 처리 메서드 (private → public으로 변경)
+    // 소셜 로그인 공통 처리 메서드
     public Map<String, Object> processSocialLogin(String email, String nickname, SocialType socialType) {
         Member existingMember = memberMapper.getMemberByEmail(email);
         String jwtToken;
@@ -297,11 +263,15 @@ public class SocialLoginService {
         response.put("accessToken", jwtToken);
         response.put("refreshToken", refreshToken);
         response.put("member", memberDto);
+        response.put("redirectUrl", frontendUrl + oauthSuccessRedirectPath + 
+                "?token=" + jwtToken + 
+                "&refreshToken=" + refreshToken + 
+                "&email=" + email);
 
         return response;
     }
     
-    // 문자열에서 SocialType으로 변환하는 메소드 추가
+    // 문자열에서 SocialType으로 변환하는 메소드
     public Map<String, Object> processSocialLogin(String email, String nickname, String providerString) {
         SocialType socialType;
         try {
